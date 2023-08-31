@@ -1,0 +1,3 @@
+*.swp
+cmd/greeter-plugin/greeter-plugin
+cmd/greeter/greeter
