@@ -1,11 +1,14 @@
 package greeter
 
 import (
-	"errors"
+	"context"
 	"fmt"
-	"net/rpc"
 
 	"github.com/hashicorp/go-plugin"
+	"github.com/korylprince/go-plugin-test/proto"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 var PluginSet = plugin.PluginSet{
@@ -20,27 +23,18 @@ var HandshakeConfig = plugin.HandshakeConfig{
 
 // Greeter is the interface implemented by the plugin
 type Greeter interface {
-	Greet(name string) (string, error)
+	Greet(ctx context.Context, name string) (string, error)
 }
 
 // ClientGreeter is client side of the RPC (e.g. your program)
 type ClientGreeter struct {
-	*rpc.Client
+	proto.GreeterClient
 }
 
-type RPCResponse struct {
-	Greeting string
-	Err      string
-}
-
-func (g *ClientGreeter) Greet(name string) (string, error) {
-	resp := new(RPCResponse)
-	err := g.Call("Plugin.Greet", name, resp)
+func (g *ClientGreeter) Greet(ctx context.Context, name string) (string, error) {
+	resp, err := g.GreeterClient.Greet(ctx, &proto.Name{Name: name})
 	if err != nil {
-		return "", fmt.Errorf("could not call rpc: %w", err)
-	}
-	if resp.Err != "" {
-		return "", errors.New(resp.Err)
+		return "", fmt.Errorf("could not call Greet: %w", err)
 	}
 
 	return resp.Greeting, nil
@@ -49,26 +43,31 @@ func (g *ClientGreeter) Greet(name string) (string, error) {
 // ServerGreeter is the server side of the RPC (e.g. the plugin)
 type ServerGreeter struct {
 	Greeter
+	proto.UnimplementedGreeterServer
 }
 
-func (s *ServerGreeter) Greet(name string, resp *RPCResponse) error {
-	greeting, err := s.Greeter.Greet(name)
-	resp.Greeting = greeting
+func (s *ServerGreeter) Greet(ctx context.Context, name *proto.Name) (*proto.Greeting, error) {
+	greeting, err := s.Greeter.Greet(ctx, name.Name)
 	if err != nil {
-		resp.Err = err.Error()
+		if _, ok := status.FromError(err); ok {
+			return nil, err
+		}
+		return nil, status.Error(codes.Unknown, err.Error())
 	}
-	return nil
+	return &proto.Greeting{Greeting: greeting}, nil
 }
 
 // GreaterPlugin implements plugin.Plugin
 type GreeterPlugin struct {
+	plugin.Plugin
 	Greeter
 }
 
-func (p *GreeterPlugin) Server(_ *plugin.MuxBroker) (interface{}, error) {
-	return &ServerGreeter{p.Greeter}, nil
+func (p *GreeterPlugin) GRPCServer(_ *plugin.GRPCBroker, server *grpc.Server) error {
+	proto.RegisterGreeterServer(server, &ServerGreeter{Greeter: p.Greeter})
+	return nil
 }
 
-func (p *GreeterPlugin) Client(_ *plugin.MuxBroker, client *rpc.Client) (interface{}, error) {
-	return &ClientGreeter{Client: client}, nil
+func (p *GreeterPlugin) GRPCClient(ctx context.Context, _ *plugin.GRPCBroker, client *grpc.ClientConn) (interface{}, error) {
+	return &ClientGreeter{GreeterClient: proto.NewGreeterClient(client)}, nil
 }

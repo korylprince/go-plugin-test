@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"os"
@@ -22,6 +23,8 @@ func main() {
 		HandshakeConfig: greeter.HandshakeConfig,
 		Plugins:         greeter.PluginSet,
 		Cmd:             exec.Command("../greeter-plugin/greeter-plugin"),
+		AllowedProtocols: []plugin.Protocol{
+			plugin.ProtocolGRPC},
 	})
 
 	// connect to RPC
@@ -40,7 +43,7 @@ func main() {
 
 	// assert to interface and use like normal
 	greeter := raw.(greeter.Greeter)
-	greeting, err := greeter.Greet(name)
+	greeting, err := greeter.Greet(context.Background(), name)
 
 	// close client to end verbose logging
 	client.Kill()

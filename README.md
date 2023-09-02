@@ -1,4 +1,4 @@
-This is a very simple test of [HashiCorp's go-plugin](https://github.com/hashicorp/go-plugin) with bidirectional communication.
+This is a very simple test of [HashiCorp's go-plugin](https://github.com/hashicorp/go-plugin) with bidirectional communication over GRPC.
 
 **How to Run**
 

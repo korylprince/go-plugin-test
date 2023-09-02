@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/hashicorp/go-plugin"
@@ -13,7 +14,7 @@ type TmplGreeter struct {
 	Tmpl string
 }
 
-func (g *TmplGreeter) Greet(name string) (string, error) {
+func (g *TmplGreeter) Greet(ctx context.Context, name string) (string, error) {
 	return fmt.Sprintf(g.Tmpl, name), nil
 }
 
@@ -24,5 +25,6 @@ func main() {
 	plugin.Serve(&plugin.ServeConfig{
 		HandshakeConfig: greeter.HandshakeConfig,
 		Plugins:         greeter.PluginSet,
+		GRPCServer:      plugin.DefaultGRPCServer,
 	})
 }
